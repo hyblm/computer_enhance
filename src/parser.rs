@@ -1,9 +1,9 @@
-use crate::{Address, EAddress, Immediate, Instruction, Location, Operation, Register, Source};
+use crate::{Address, EAddress, Immediate, Instruction, Location, Op, Register, Source};
 
 use nom::{
     bits::complete::{bool, take},
     combinator::map,
-    IResult,
+    IResult, InputIter, InputLength, Slice,
 };
 
 pub type BitInput<'a> = (&'a [u8], usize);
@@ -12,11 +12,9 @@ pub fn parse_instruction(i: BitInput) -> IResult<BitInput, Instruction> {
     use nom::sequence::tuple;
     let (i, opcode) = parse_opcode(i)?;
     let (i, destination, source) = match opcode {
-        Operation::MovRegRM => {
+        Op::MovRegRM => {
             let (i, (d_bit, is_word, mode)) = tuple((bool, bool, take_2bits))(i)?;
-
-            // TODO(matyas): remove is_word parameter from RM and Register parsers
-            let (i, reg) = parse_reg(is_word, i)?;
+            let (i, reg) = parse_reg(is_word)(i)?;
             let (i, rm) = parse_rm(mode, is_word, i)?;
             if d_bit {
                 (i, Location::Reg(reg), Source::Loc(rm))
@@ -24,14 +22,14 @@ pub fn parse_instruction(i: BitInput) -> IResult<BitInput, Instruction> {
                 (i, rm, Source::Loc(Location::Reg(reg)))
             }
         }
-        Operation::MovImmediateReg => {
+        Op::MovImmediateReg => {
             let (i, is_word) = bool(i)?;
-            let (i, reg) = parse_reg(is_word, i)?;
+            let (i, reg) = parse_reg(is_word)(i)?;
             let (i, val) = parse_immediate(i, is_word)?;
             (i, Location::Reg(reg), Source::Imm(val))
         }
-        Operation::MovImmediateRM => todo!(),
-        Operation::Unimplemented => todo!(),
+        Op::MovImmediateRM => todo!(),
+        Op::Unimplemented => todo!(),
     };
     let instruction = Instruction {
         _address: 0,
@@ -55,10 +53,11 @@ fn parse_immediate(i: BitInput, is_word: bool) -> IResult<BitInput, Immediate> {
     })
 }
 
+// TODO(matyas): remove is_word and mode parameters from RM parser
 fn parse_rm(mode: u8, w_bit: bool, i: BitInput) -> IResult<BitInput, Location> {
     assert!(mode <= 3);
     if let 0b11 = mode {
-        let (i, reg) = parse_reg(w_bit, i)?;
+        let (i, reg) = parse_reg(w_bit)(i)?;
         Ok((i, Location::Reg(reg)))
     } else {
         let (i, addr) = parse_addr(i)?;
@@ -107,29 +106,34 @@ pub fn take_2bits(i: BitInput) -> IResult<BitInput, u8> {
     take(2u8)(i)
 }
 
-pub fn parse_reg(w_bit: bool, i: BitInput) -> IResult<BitInput, Register> {
-    let reg_reader = if w_bit {
-        Register::word
-    } else {
-        Register::byte
-    };
-    map(take_3bits, reg_reader)(i)
+pub fn parse_reg<I>(w_bit: bool) -> impl FnMut((I, usize)) -> IResult<(I, usize), Register>
+where
+    I: Slice<std::ops::RangeFrom<usize>> + InputIter<Item = u8> + InputLength,
+{
+    map(
+        take(3u8),
+        if w_bit {
+            Register::word
+        } else {
+            Register::byte
+        },
+    )
 }
 
-pub fn parse_opcode(i: BitInput) -> IResult<BitInput, Operation> {
+pub fn parse_opcode(i: BitInput) -> IResult<BitInput, Op> {
     let (i, partial) = take_nibble(i)?;
     let (i, opcode) = match partial {
         0b1000 => {
             let (i, _) = take_2bits(i)?;
-            (i, Operation::MovRegRM)
+            (i, Op::MovRegRM)
         }
-        0b1011 => (i, Operation::MovImmediateReg),
+        0b1011 => (i, Op::MovImmediateReg),
         0b1100 => todo!("Immediate to register/memory"),
         0b1010 => todo!("Memory to/from accumulator"),
         _ => {
             println!("partial: {partial:0b}");
             println!("input: {:?}", i.0);
-            (i, Operation::Unimplemented)
+            (i, Op::Unimplemented)
         }
     };
     Ok((i, opcode))

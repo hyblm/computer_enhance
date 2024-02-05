@@ -23,7 +23,7 @@ pub fn disassemble(program: &[u8]) -> String {
 pub struct Instruction {
     _address: usize,
     _size: usize,
-    operation: Operation,
+    operation: Op,
     destination: Location,
     source: Source,
 }
@@ -92,16 +92,16 @@ impl Display for Immediate {
 }
 
 #[derive(Debug)]
-pub enum Operation {
+pub enum Op {
     MovRegRM,
     MovImmediateRM,
     MovImmediateReg,
     Unimplemented,
 }
-impl Display for Operation {
+impl Display for Op {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let opcode_string = match self {
-            Operation::MovRegRM | Operation::MovImmediateRM | Operation::MovImmediateReg => "mov",
+            Op::MovRegRM | Op::MovImmediateRM | Op::MovImmediateReg => "mov",
             _ => "unimplemented!",
         };
         write!(f, "{}", opcode_string)

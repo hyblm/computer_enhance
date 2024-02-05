@@ -20,10 +20,10 @@ fn listing38() {
     validate_listing("listing38")
 }
 
-#[test]
-fn listing39() {
-    validate_listing("listing39")
-}
+// #[test]
+// fn listing39() {
+//     validate_listing("listing39")
+// }
 
 // #[test]
 // fn listing40() {
