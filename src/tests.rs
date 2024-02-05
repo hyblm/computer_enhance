@@ -6,85 +6,91 @@ use std::{
 };
 
 #[test]
+fn file_validation() {
+    validate_listing("listing0")
+}
+
+#[test]
 fn listing37() {
     validate_listing("listing37")
 }
+
 #[test]
 fn listing38() {
     validate_listing("listing38")
 }
+
 #[test]
 fn listing39() {
     validate_listing("listing39")
 }
 
-mod listing39;
-
-fn validate_asm(asm: &str) {
-    println!("{}", asm);
-    // assemble the listing
-    let listing: String = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(7)
-        .map(char::from)
-        .collect();
-    let src_path = format!("{listing}.asm");
-    let _ = fs::write(&src_path, asm);
-    Command::new("nasm").args([&src_path]).output().unwrap();
-
-    // disassemble
-    let src = fs::read(&listing).expect("listing is in project directory");
-    remove_file(&listing).unwrap();
-    remove_file(src_path).unwrap();
-    let dasm = disassemble(&src);
-
-    let dasm_path = format!("{listing}-d.asm");
-    let _ = fs::write(&dasm_path, dasm);
-
-    // assemble the disassembly
-    Command::new("nasm").args([&dasm_path]).output().unwrap();
-
-    let bin_path = format!("{listing}-d");
-    let new = fs::read(&bin_path).expect("listing is in project directory");
-
-    // cleanup
-    remove_file(bin_path).unwrap();
-    remove_file(dasm_path).unwrap();
-
-    assert_eq!(new, src);
-}
-
 // #[test]
-// fn file_validation() {
-//     validate_listing("listing0")
+// fn listing40() {
+//     validate_listing("listing40")
 // }
+
+mod listing39;
+// mod listing40;
 
 /// Takes a listing name (eg. "listing37")
 /// - assembles its asm file
 /// - dissassembles the binary and saves it to a file
 /// - assembles the dissassembly and finaly compares the two binaries
 fn validate_listing(listing: &str) {
-    // assemble the listing
-    let src_path = format!("{listing}.asm");
-    Command::new("nasm").args([&src_path]).output().unwrap();
+    let src_path = format!("./listings/{}.asm", listing);
 
-    // disassemble
-    let src = fs::read(listing).expect("listing is in project directory");
-    remove_file(listing).unwrap();
-    let dasm = disassemble(&src);
+    let (bin1, bin2) = produce_bins(&src_path);
+    assert_eq!(bin1, bin2);
+}
+fn validate_asm(asm: &str) {
+    println!("{}", asm);
 
-    let dasm_path = format!("{listing}-d.asm");
-    let _ = fs::write(&dasm_path, dasm);
+    let binary_path: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(7)
+        .map(char::from)
+        .collect();
+    let src_path = &format!("listings/tmp/{}.asm", binary_path);
 
-    // assemble the disassembly
-    Command::new("nasm").args([&dasm_path]).output().unwrap();
+    fs::write(src_path, asm).unwrap();
+    let (dasm_bin, asm_bin) = produce_bins(src_path);
 
-    let bin_path = format!("{listing}-d");
-    let new = fs::read(&bin_path).expect("listing is in project directory");
+    if let Err(err) = remove_file(src_path) {
+        eprintln!("{}", err);
+    };
 
-    // cleanup
-    remove_file(bin_path).unwrap();
-    remove_file(dasm_path).unwrap();
+    assert_eq!(dasm_bin, asm_bin);
+}
+fn produce_bins(src_path: &str) -> (Vec<u8>, Vec<u8>) {
+    let produce_bin = |src_path, bin_path| {
+        Command::new("nasm")
+            .args([src_path])
+            .output()
+            .and_then(|_| fs::read(bin_path))
+    };
+    let (src_path, bin_path) = src_bin_paths(src_path);
+    let src_path2 = format!("{}-d.asm", bin_path);
+    let (src_path2, bin_path2) = src_bin_paths(&src_path2);
 
-    assert_eq!(new, src);
+    let bin1 = produce_bin(src_path, bin_path).expect("Assembly compiled and read");
+
+    let bin2 =
+        fs::write(src_path2, disassemble(&bin1)).and_then(|_| produce_bin(src_path2, bin_path2));
+
+    if let Err(err) = remove_file(src_path2) {
+        eprintln!("{}", err);
+    };
+    if let Err(err) = remove_file(bin_path) {
+        eprintln!("{}", err);
+    };
+    if let Err(err) = remove_file(bin_path2) {
+        eprintln!("{}", err);
+    };
+
+    (bin1, bin2.expect("Disassembly compiled and read"))
+}
+
+fn src_bin_paths(src_path: &str) -> (&str, &str) {
+    (src_path, src_path.get(..src_path.len() - 4).unwrap())
 }
