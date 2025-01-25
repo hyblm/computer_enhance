@@ -1,5 +1,8 @@
 use std::{env::args, io::Read};
 
+#[cfg(test)]
+mod tests;
+
 fn main() {
     let mut args = args();
 
@@ -8,7 +11,7 @@ fn main() {
         return;
     };
 
-    let Ok(mut file) = std::fs::File::open(&binary_file_path) else {
+    let Ok(mut file) = std::fs::File::open(binary_file_path) else {
         return;
     };
 
@@ -21,8 +24,12 @@ fn main() {
         Ok(bytes_read) => bytes_read,
     };
 
-    println!(";; dissassembly of {binary_file_path}\nbits 16\n");
-    let mut memory = &memory[..program_length];
+    let mut disassembly = String::from(";; dissassembly of {binary_file_path}\nbits 16\n");
+    decode_program_instructions(&memory[..program_length], &mut disassembly);
+    println!("{disassembly}");
+}
+
+fn decode_program_instructions(mut memory: &[u8], disassembly: &mut String) {
     while !memory.is_empty() {
         let byte = memory[0];
         memory = &memory[1..];
@@ -31,7 +38,7 @@ fn main() {
         let opcode = byte & MASK_OPCODE;
         match opcode {
             opcode::MOV => {
-                print!("mov ");
+                disassembly.push_str("mov ");
                 let mut _md = memory[0];
                 let rm = _md & MASK_REG;
                 _md >>= 3;
@@ -42,17 +49,17 @@ fn main() {
                 let source = rg;
 
                 if word_mode {
-                    println!(
-                        "{:?}, {:?}",
+                    disassembly.push_str(&format!(
+                        "{:?}, {:?}\n",
                         RegisterWord::from_u8_discriminant(target).unwrap(),
                         RegisterWord::from_u8_discriminant(source).unwrap(),
-                    )
+                    ))
                 } else {
-                    println!(
-                        "{:?}, {:?}",
+                    disassembly.push_str(&format!(
+                        "{:?}, {:?}\n",
                         RegisterByte::from_u8_discriminant(target).unwrap(),
                         RegisterByte::from_u8_discriminant(source).unwrap(),
-                    )
+                    ))
                 }
             }
             _ => println!("unrecognized opcode"),
