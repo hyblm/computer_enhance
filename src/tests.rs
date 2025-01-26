@@ -40,7 +40,7 @@ fn read_listing(binary_file_path: &str) -> (Vec<u8>, usize) {
     (memory, program_length)
 }
 
-mod homework_1 {
+mod base {
     use super::process_file_listing;
 
     #[test]
@@ -51,5 +51,19 @@ mod homework_1 {
     #[test]
     fn listing_38() {
         process_file_listing("part_1/listing_0038_many_register_mov");
+    }
+
+    #[test]
+    fn listing_39() {
+        process_file_listing("part_1/listing_0039_more_movs");
+    }
+}
+
+mod challenge {
+    use super::process_file_listing;
+
+    #[test]
+    fn listing_40() {
+        process_file_listing("part_1/listing_0040_challenge_movs");
     }
 }
