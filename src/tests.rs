@@ -57,6 +57,11 @@ mod base {
     fn listing_39() {
         process_file_listing("part_1/listing_0039_more_movs");
     }
+
+    #[test]
+    fn listing_41() {
+        process_file_listing("part_1/listing_0041_add_sub_cmp_jnz");
+    }
 }
 
 mod challenge {
@@ -66,4 +71,9 @@ mod challenge {
     fn listing_40() {
         process_file_listing("part_1/listing_0040_challenge_movs");
     }
+
+    // #[test]
+    // fn listing_42() {
+    //     process_file_listing("part_1/listing_0042_completionist_decode");
+    // }
 }
