@@ -1,79 +1,98 @@
-use std::io::{Read, Write};
+use std::io::Write;
 
-use crate::decode_program_instructions;
+use crate::{decode, read_listing};
 
 fn process_file_listing(binary_file_path: &str) {
-    let (memory, program_length) = read_listing(binary_file_path);
+    // disassemble listing
+    let (memory, length) = read_listing(binary_file_path);
+    let disassembly = decode::all_instructions(&memory[..length]);
+    let (memory_new, length_new) = assemble(disassembly, binary_file_path);
 
-    let mut disassembly = String::new();
-    decode_program_instructions(&memory[..program_length], &mut disassembly);
+    assert_eq!(length, length_new);
+    assert_eq!(memory, memory_new);
+}
 
-    let path_binary = format!("{binary_file_path}_generated");
-    let path_asm = format!("{path_binary}.asm");
+/// Save the dissasembly into a file, run nasm on it, and then load and return the resulting binary.
+/// The assembly and binary files are deleted before this function returns.
+fn assemble(disassembly: String, base_name: &str) -> (Vec<u8>, usize) {
+    let path_bin = format!("{base_name}_generated");
+    let path_asm = format!("{path_bin}.asm");
+
+    // save disassembly into a file and run it through nasm
     let mut file = std::fs::File::create(&path_asm).unwrap();
-
     file.write_all(disassembly.as_bytes()).unwrap();
     std::process::Command::new("nasm")
         .arg(&path_asm)
         .output()
         .expect("failed to execute process");
 
-    let (new_memory, new_program_length) = read_listing(&path_binary);
+    eprintln!("{path_bin}");
+    eprintln!("{path_asm}");
+    let (new_memory, new_program_length) = read_listing(&path_bin);
+
+    // cleanup before asserts
     std::fs::remove_file(&path_asm).unwrap();
-    std::fs::remove_file(&path_binary).unwrap();
-
-    assert_eq!(program_length, new_program_length);
-    assert_eq!(memory, new_memory);
+    std::fs::remove_file(&path_bin).unwrap();
+    (new_memory, new_program_length)
 }
 
-fn read_listing(binary_file_path: &str) -> (Vec<u8>, usize) {
-    let mut file = std::fs::File::open(binary_file_path).unwrap();
-
-    let mut memory = Vec::new();
-    let program_length = match file.read_to_end(&mut memory) {
-        Err(error) => {
-            panic!("Failed to read the file with error: {error}");
-        }
-        Ok(bytes_read) => bytes_read,
-    };
-
-    (memory, program_length)
-}
-
-mod base {
-    use super::process_file_listing;
+mod decoding {
+    use crate::tests::process_file_listing;
 
     #[test]
-    fn listing_37() {
+    fn listing_37_single_register_mov() {
         process_file_listing("part_1/listing_0037_single_register_mov");
     }
 
     #[test]
-    fn listing_38() {
+    fn listing_38_many_register_mov() {
         process_file_listing("part_1/listing_0038_many_register_mov");
     }
 
     #[test]
-    fn listing_39() {
+    fn listing_39_more_movs() {
         process_file_listing("part_1/listing_0039_more_movs");
     }
 
     #[test]
-    fn listing_41() {
+    fn listing_41_add_sub_cmp_jnz() {
         process_file_listing("part_1/listing_0041_add_sub_cmp_jnz");
+    }
+
+    #[test]
+    fn listing_43_immediate_movs() {
+        process_file_listing("part_1/listing_0043_immediate_movs");
+    }
+
+    #[test]
+    fn listing_44_register_movs() {
+        process_file_listing("part_1/listing_0044_register_movs");
     }
 }
 
-mod challenge {
-    use super::process_file_listing;
+mod simulation {
+    #[test]
+    fn listing_43_immediate_movs() {}
 
     #[test]
-    fn listing_40() {
-        process_file_listing("part_1/listing_0040_challenge_movs");
-    }
+    fn listing_44_register_movs() {}
+}
+
+mod challenge {
+    // use super::process_file_listing;
+
+    // #[test]
+    // fn listing_40() {
+    //     process_file_listing("part_1/listing_0040_challenge_movs");
+    // }
 
     // #[test]
     // fn listing_42() {
     //     process_file_listing("part_1/listing_0042_completionist_decode");
+    // }
+
+    // #[test]
+    // fn listing_45() {
+    //     process_file_listing("part_1/listing_0045_challenge_register_movs");
     // }
 }
