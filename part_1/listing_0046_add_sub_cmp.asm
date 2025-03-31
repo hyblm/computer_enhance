@@ -11,28 +11,19 @@
 ; ========================================================================
 
 ; ========================================================================
-; LISTING 40 - Challenge MOVs
+; LISTING 46
 ; ========================================================================
 
 bits 16
 
-; Signed displacements
-mov ax, [bx + di - 37]
-mov [si - 300], cx
-mov dx, [bx - 32]
+mov bx, -4093
+mov cx, 3841
+sub bx, cx
 
-; Explicit sizes
-mov [bp + di], byte 7
-mov [di + 901], word 347
+mov sp, 998
+mov bp, 999
+cmp bp, sp
 
-; Direct address
-mov bp, [5]
-mov bx, [3458]
+add bp, 1027
+sub bp, 2026
 
-; Memory-to-accumulator test
-mov ax, [2555]
-mov ax, [16]
-
-; Accumulator-to-memory test
-mov [2554], ax
-mov [15], ax

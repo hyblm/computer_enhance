@@ -1,212 +1,464 @@
-mod parser;
+use std::{fmt::Display, io::Read};
+
+use decode::advance_by;
+use exec::State;
+
+pub mod decode;
+pub mod exec;
+
 #[cfg(test)]
 mod tests;
 
-use crate::parser::parse_instruction;
-use core::fmt;
-use std::fmt::Display;
+pub fn read_listing(binary_file_path: &str) -> (Vec<u8>, usize) {
+    let mut file = std::fs::File::open(binary_file_path).unwrap();
 
-pub fn disassemble(program: &[u8]) -> String {
-    let mut instruction_stream = (program, 0);
-    let mut asm = format!("bits 16\n\n");
+    let mut memory = Vec::new();
+    let length = match file.read_to_end(&mut memory) {
+        Err(error) => {
+            panic!("Failed to read the file with error: {error}");
+        }
+        Ok(bytes_read) => bytes_read,
+    };
 
-    while !instruction_stream.0.is_empty() {
-        let (tail, instruction) = parse_instruction(instruction_stream).unwrap();
-        // println!("{instruction:?}");
-        asm.push_str(&format!("{instruction}\n"));
+    (memory, length)
+}
 
-        instruction_stream = tail;
+#[derive(Debug, Clone, Copy)]
+pub enum Instruction {
+    Arithmetic {
+        op: u8,
+        target: Place,
+        source: Place,
+    },
+    ArithmeticImmediate {
+        op: u8,
+        target: Place,
+        immediate: u16,
+    },
+    ArithmeticImmediateToMemory {
+        word_mode: bool,
+        op: u8,
+        target: Place,
+        immediate: u16,
+    },
+    Jump {
+        marker: u8,
+        offset: i8,
+    },
+    Loop {
+        marker: u8,
+        offset: i8,
+    },
+    Mov {
+        target: Place,
+        source: Place,
+    },
+    MovImmediate {
+        target: Place,
+        immediate: u16,
+    },
+    MovImmediateToMemory {
+        word_mode: bool,
+        target: Place,
+        immediate: u16,
+    },
+    Unrecognized(u8),
+}
+impl Instruction {
+    fn target(&self) -> Option<Place> {
+        match self {
+            Instruction::Arithmetic { target, .. }
+            | Instruction::ArithmeticImmediate { target, .. }
+            | Instruction::ArithmeticImmediateToMemory { target, .. }
+            | Instruction::Mov { target, .. }
+            | Instruction::MovImmediate { target, .. }
+            | Instruction::MovImmediateToMemory { target, .. } => Some(*target),
+            _ => None,
+        }
     }
-    asm
-}
 
-pub struct Instruction {
-    _address: usize,
-    _size: usize,
-    operation: Op,
-    destination: Location,
-    source: Source,
-}
-impl fmt::Debug for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:?} {:?}, {:?}",
-            self.operation, self.destination, self.source
-        )
+    pub const MATH: [&'static str; 8] = ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"];
+    pub const JUMP: [&'static str; 8] = ["o", "b", "z", "be", "s", "p", "l", "le"];
+    pub const LOOP: [&'static str; 4] = ["loopnz", "loopz", "loop", "jcxz"];
+
+    #[allow(unused_variables)]
+    fn run(self, state: &mut State) {
+        use RegisterWord::*;
+        match self {
+            Instruction::MovImmediate { target, immediate } => match target {
+                Place::Byte(reg) => state.registers[reg] = immediate as u8,
+                Place::Word(reg) => state.registers[reg] = immediate,
+                Place::Adress(_) => todo!(),
+            },
+            Instruction::Arithmetic { op, target, source } => {
+                let result = match (Self::MATH[op as usize], target, source) {
+                    // (Place::Byte(_), Place::Byte(_)) => todo!(),
+                    // (Place::Byte(_), Place::Word(_)) => todo!(),
+                    // (Place::Byte(_), Place::Adress(_)) => todo!(),
+                    // (Place::Word(_), Place::Byte(_)) => todo!(),
+                    ("add", Place::Word(target), Place::Word(source)) => {
+                        state.registers[target] =
+                            state.registers[target].wrapping_add(state.registers[source]);
+                        state.registers[target]
+                    }
+                    ("add", Place::Word(target), Place::Adress(source)) => {
+                        match source.mode {
+                            Mode::EffectiveAdress => {
+                                let i: usize = match source.index {
+                                    0b110 => source.displacement,
+                                    0b010 => state.registers[BP] + state.registers[SI],
+                                    _ => todo!(),
+                                }
+                                .into();
+                                let hi = state.memory[i];
+                                let lo = state.memory[i + 1];
+                                let value = u16::from_be_bytes([hi, lo]);
+                                state.registers[target] = value;
+                            }
+                            Mode::EffectiveAdressByte => todo!(),
+                            Mode::EffectiveAdressWord => todo!(),
+                            Mode::RegisterToRegister => todo!(),
+                        };
+                        // registers[target] = registers[target].wrapping_add(registers[source]);
+                        state.registers[target]
+                    }
+                    ("sub", Place::Word(target), Place::Word(source)) => {
+                        state.registers[target] =
+                            state.registers[target].wrapping_sub(state.registers[source]);
+                        state.registers[target]
+                    }
+                    ("cmp", Place::Word(target), Place::Word(source)) => {
+                        state.registers[target].wrapping_sub(state.registers[source])
+                    }
+                    // (Place::Word(_), Place::Adress(_)) => todo!(),
+                    // (Place::Adress(_), Place::Byte(_)) => todo!(),
+                    // (Place::Adress(_), Place::Word(_)) => todo!(),
+                    // (Place::Adress(_), Place::Adress(_)) => todo!(),
+                    _ => todo!(),
+                };
+                state.registers.flag_sign = (result & 0x8000) > 0;
+                state.registers.flag_zero = result == 0;
+            }
+            Instruction::ArithmeticImmediate {
+                op,
+                target: register,
+                immediate,
+            } => todo!(),
+            Instruction::ArithmeticImmediateToMemory {
+                word_mode,
+                op,
+                target,
+                immediate,
+            } => {
+                let result = match (Self::MATH[op as usize], target) {
+                    ("add", Place::Word(target)) => {
+                        state.registers[target] = state.registers[target].wrapping_add(immediate);
+                        state.registers[target]
+                    }
+                    ("sub", Place::Word(target)) => {
+                        state.registers[target] = state.registers[target].wrapping_sub(immediate);
+                        state.registers[target]
+                    }
+                    ("cmp", Place::Word(target)) => state.registers[target].wrapping_sub(immediate),
+                    _ => todo!(),
+                };
+                state.registers.flag_sign = (result & 0x8000) > 0;
+                state.registers.flag_zero = result == 0;
+            }
+            Instruction::Jump { marker, offset } => {
+                let negated = (marker & 1) > 0;
+                let kind = Self::JUMP[((marker >> 1) & 0b111) as usize];
+                match kind {
+                    "o" => todo!(),
+                    "b" => todo!(),
+                    "z" => {
+                        if state.registers.flag_zero ^ negated {
+                            if offset.is_positive() {
+                                state.instruction_pointer += offset as usize;
+                            } else {
+                                state.instruction_pointer -= offset.abs() as usize;
+                            }
+                        }
+                    }
+                    "be" => todo!(),
+                    "s" => todo!(),
+                    "p" => todo!(),
+                    "l" => todo!(),
+                    "le" => todo!(),
+                    _ => unreachable!(),
+                }
+                // todo!()
+            }
+            Instruction::Loop { marker, offset } => todo!(),
+            Instruction::Mov { target, source } => match (target, source) {
+                (Place::Byte(target), Place::Byte(source)) => todo!(),
+                (Place::Byte(target), Place::Word(source)) => todo!(),
+                (Place::Byte(target), Place::Adress(source)) => todo!(),
+                (Place::Word(target), Place::Byte(source)) => todo!(),
+                (Place::Word(target), Place::Word(source)) => {
+                    state.registers[target] = state.registers[source]
+                }
+                (Place::Word(target), Place::Adress(source)) => match source.mode {
+                    Mode::EffectiveAdress => {
+                        let i: usize = match source.index {
+                            0b110 => source.displacement,
+                            0b010 => state.registers[BP] + state.registers[SI],
+                            _ => todo!(),
+                        }
+                        .into();
+                        let hi = state.memory[i];
+                        let lo = state.memory[i + 1];
+                        let value = u16::from_be_bytes([hi, lo]);
+                        state.registers[target] = value;
+                    }
+                    Mode::EffectiveAdressByte => todo!(),
+                    Mode::EffectiveAdressWord => todo!(),
+                    Mode::RegisterToRegister => todo!(),
+                },
+                (Place::Adress(target), Place::Byte(source)) => todo!(),
+                (Place::Adress(target), Place::Word(source)) => {
+                    let value = state.registers[source];
+                    let bytes = value.to_be_bytes();
+                    match target.mode {
+                        Mode::EffectiveAdress => {
+                            let i: usize = match target.index {
+                                0b010 => state.registers[BP] + state.registers[SI],
+                                _ => todo!(),
+                            }
+                            .into();
+                            state.memory[i..(i + 2)].copy_from_slice(&bytes);
+                        }
+                        Mode::EffectiveAdressByte => {
+                            let i: usize = match target.index {
+                                0b110 => {
+                                    // print!("      uwu      ");
+                                    state.registers[BP]
+                                }
+                                _ => todo!(),
+                            }
+                            .into();
+                            state.memory[i] = value as u8;
+                        }
+                        Mode::EffectiveAdressWord => todo!(),
+                        Mode::RegisterToRegister => todo!(),
+                    }
+                }
+                (Place::Adress(target), Place::Adress(source)) => todo!(),
+            },
+            Instruction::MovImmediateToMemory {
+                word_mode,
+                target,
+                immediate,
+            } => match target {
+                Place::Byte(_) => todo!(),
+                Place::Word(_) => todo!(),
+                Place::Adress(address) => {
+                    let bytes = immediate.to_be_bytes();
+                    let i: usize = match address.mode {
+                        Mode::EffectiveAdress => match address.index {
+                            0b110 => address.displacement,
+                            _ => todo!(),
+                        },
+                        Mode::EffectiveAdressByte => {
+                            (match address.index {
+                                0b110 => state.registers[BP],
+                                0b111 => state.registers[BX],
+                                _ => todo!(),
+                            } + address.displacement)
+                        }
+                        Mode::EffectiveAdressWord => todo!(),
+                        Mode::RegisterToRegister => todo!(),
+                    }
+                    .into();
+                    state.memory[i..(i + 2)].copy_from_slice(&bytes);
+                }
+            },
+            Instruction::Unrecognized(_) => todo!(),
+        };
     }
 }
+
 impl Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}, {}",
-            self.operation, self.destination, self.source
-        )
+        match self {
+            Instruction::Arithmetic { op, target, source } => {
+                let var_name = {
+                    let op = Self::MATH[*op as usize];
+                    write!(f, "{op} {target}, {source}")
+                };
+                var_name
+            }
+            Instruction::ArithmeticImmediate {
+                op,
+                target: register,
+                immediate,
+            } => {
+                let op = Self::MATH[*op as usize];
+                write!(f, "{op} {register}, {immediate}")
+            }
+            Instruction::ArithmeticImmediateToMemory {
+                word_mode,
+                op,
+                target,
+                immediate,
+            } => {
+                let op = Self::MATH[*op as usize];
+                let size = if *word_mode { "word" } else { "byte" };
+                write!(f, "{op} {size} {target}, {immediate}")
+            }
+            Instruction::Jump { marker, offset } => {
+                let negated = if (marker & 1) > 0 { "n" } else { "" };
+                let kind = Self::JUMP[((marker >> 1) & 0b111) as usize];
+                write!(f, "j{negated}{kind} $+2{offset:+}")
+            }
+            Instruction::Loop { marker, offset } => {
+                let kind = Self::LOOP[(marker & 0b11) as usize];
+                write!(f, "{kind} $+2{offset:+}")
+            }
+            Instruction::Mov { target, source } => write!(f, "mov {target}, {source}"),
+            Instruction::MovImmediate { target, immediate } => {
+                write!(f, "mov {target}, {immediate}")
+            }
+            Instruction::MovImmediateToMemory {
+                word_mode,
+                target,
+                immediate,
+            } => {
+                let size = if *word_mode { "word" } else { "byte" };
+                write!(f, "mov {target}, {size} {immediate}")
+            }
+            Instruction::Unrecognized(byte) => {
+                write!(f, "\x1B[1m\x1B[31m{byte:2x}\x1B[0m unrecognized")
+            }
+        }
     }
 }
 
-#[derive(Debug)]
-pub enum Location {
-    Reg(Register),
-    Addr(EAddress),
+#[derive(Debug, Clone, Copy)]
+pub struct EffectiveAdress {
+    index: u8,
+    mode: Mode,
+    displacement: u16,
 }
-impl Display for Location {
+impl EffectiveAdress {
+    const ADRESS_CALCULATION: [&'static str; 8] = [
+        "BX + SI", "BX + DI", "BP + SI", "BP + DI", "SI", "DI", "BP", "BX",
+    ];
+}
+impl std::fmt::Display for EffectiveAdress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.mode == Mode::EffectiveAdress && self.index == 0b110 {
+            write!(f, "[{}]", self.displacement)
+        } else {
+            write!(
+                f,
+                "[{} + {}]",
+                Self::ADRESS_CALCULATION[self.index as usize],
+                self.displacement
+            )
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[repr(u8)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+enum Mode {
+    EffectiveAdress = 0b00,
+    EffectiveAdressByte = 0b01,
+    EffectiveAdressWord = 0b10,
+    RegisterToRegister = 0b11,
+}
+
+impl Mode {
+    fn from_u8_discriminant(discriminant: u8) -> Option<Self> {
+        if discriminant > 0b11 {
+            return None;
+        }
+        Some(unsafe { std::mem::transmute::<u8, Self>(discriminant) })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Place {
+    Byte(RegisterByte),
+    Word(RegisterWord),
+    Adress(EffectiveAdress),
+}
+
+impl std::fmt::Display for Place {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Location::Reg(reg) => write!(f, "{reg}"),
-            Location::Addr(eaddr) => match eaddr {
-                EAddress::Bare(addr) => write!(f, "[{addr}]"),
-                EAddress::WithOffset(addr, offset) => write!(f, "[{addr} + {offset}]"),
-            },
+            Place::Byte(reg) => write!(f, "{reg:?}"),
+            Place::Word(reg) => write!(f, "{reg:?}"),
+            Place::Adress(ea) => ea.fmt(f),
         }
     }
 }
 
-#[derive(Debug)]
-pub enum Source {
-    Loc(Location),
-    Imm(Immediate),
-}
-impl Display for Source {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Source::Loc(loc) => write!(f, "{}", loc),
-            Source::Imm(imm) => write!(f, "{imm}"),
+impl Place {
+    fn register(word_mode: bool, disc: u8) -> Self {
+        if word_mode {
+            Self::Word(RegisterWord::from_octal(disc).unwrap())
+        } else {
+            Self::Byte(RegisterByte::from_octal(disc).unwrap())
+        }
+    }
+
+    fn address(r_m: u8, mode: Mode, memory: &mut &[u8]) -> Self {
+        let displacement = if mode == Mode::EffectiveAdress && r_m == 0b110 {
+            advance_by(memory, 2)
+        } else {
+            advance_by(memory, mode as usize)
+        } as u16;
+        Self::Adress(EffectiveAdress {
+            index: r_m,
+            mode,
+            displacement,
+        })
+    }
+
+    fn resolve_rm(r_m: u8, mode: Mode, word_mode: bool, memory: &mut &[u8]) -> Self {
+        if let Mode::RegisterToRegister = mode {
+            Place::register(word_mode, r_m)
+        } else {
+            Place::address(r_m, mode, memory)
         }
     }
 }
 
-#[derive(Debug)]
-pub enum Immediate {
-    Byte(u8),
-    Word(u16),
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+#[rustfmt::skip]
+#[repr(u8)]
+pub enum RegisterByte {
+AL, CL, DL, BL,
+AH, CH, DH, BH,
 }
-impl Display for Immediate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Immediate::Byte(imm) => write!(f, "{imm}"),
-            Immediate::Word(imm) => write!(f, "{imm}"),
+
+impl RegisterByte {
+    fn from_octal(octal: u8) -> Option<Self> {
+        if octal > 0b111 {
+            return None;
         }
+        Some(unsafe { std::mem::transmute::<u8, Self>(octal) })
     }
 }
 
-#[derive(Debug)]
-pub enum Op {
-    MovRegRM,
-    MovImmediateRM,
-    MovImmediateReg,
-    Unimplemented,
-}
-impl Display for Op {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let opcode_string = match self {
-            Op::MovRegRM | Op::MovImmediateRM | Op::MovImmediateReg => "mov",
-            _ => "unimplemented!",
-        };
-        write!(f, "{}", opcode_string)
-    }
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+#[rustfmt::skip]
+#[repr(u8)]
+pub enum RegisterWord {
+AX, CX, DX, BX,
+SP, BP, SI, DI,
 }
 
-#[derive(Debug)]
-pub enum EAddress {
-    Bare(Address),
-    WithOffset(Address, Immediate),
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum Address {
-    BxSi,
-    BxDi,
-    BpSi,
-    BpDi,
-    Si,
-    Di,
-    Bp,
-    Bx,
-}
-
-impl Display for Address {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let str = match self {
-            Address::BxSi => "bx + si",
-            Address::BxDi => "bx + di",
-            Address::BpSi => "bp + si",
-            Address::BpDi => "bp + di",
-            Address::Si => "si",
-            Address::Di => "di",
-            Address::Bp => "bp",
-            Address::Bx => "bx",
-        };
-        write!(f, "{str}")
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum Register {
-    Al,
-    Dl,
-    Cl,
-    Bl,
-    Ah,
-    Dh,
-    Ch,
-    Bh,
-    Ax,
-    Dx,
-    Cx,
-    Bx,
-    Sp,
-    Bp,
-    Si,
-    Di,
-}
-impl Register {
-    fn byte(value: u8) -> Self {
-        match value {
-            0b000 => Self::Al,
-            0b001 => Self::Cl,
-            0b010 => Self::Dl,
-            0b011 => Self::Bl,
-            0b100 => Self::Ah,
-            0b101 => Self::Ch,
-            0b110 => Self::Dh,
-            _ => Self::Bh,
+impl RegisterWord {
+    fn from_octal(octal: u8) -> Option<Self> {
+        if octal > 0b111 {
+            return None;
         }
-    }
-    fn word(value: u8) -> Self {
-        match value {
-            0b000 => Self::Ax,
-            0b001 => Self::Cx,
-            0b010 => Self::Dx,
-            0b011 => Self::Bx,
-            0b100 => Self::Sp,
-            0b101 => Self::Bp,
-            0b110 => Self::Si,
-            _ => Self::Di,
-        }
-    }
-}
-impl Display for Register {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let register_str = match self {
-            Register::Al => "al",
-            Register::Dl => "dl",
-            Register::Cl => "cl",
-            Register::Bl => "bl",
-            Register::Ah => "ah",
-            Register::Dh => "dh",
-            Register::Ch => "ch",
-            Register::Bh => "bh",
-            Register::Ax => "ax",
-            Register::Dx => "dx",
-            Register::Cx => "cx",
-            Register::Bx => "bx",
-            Register::Sp => "sp",
-            Register::Bp => "bp",
-            Register::Si => "si",
-            Register::Di => "di",
-        };
-        write!(f, "{}", register_str)
+        Some(unsafe { std::mem::transmute::<u8, Self>(octal) })
     }
 }

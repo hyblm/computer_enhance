@@ -1,96 +1,98 @@
-use crate::disassemble;
-use rand::{distributions::Alphanumeric, Rng};
-use std::{
-    fs::{self, remove_file},
-    process::Command,
-};
+use std::io::Write;
 
-#[test]
-fn file_validation() {
-    validate_listing("listing0")
+use crate::{decode, read_listing};
+
+fn process_file_listing(binary_file_path: &str) {
+    // disassemble listing
+    let (memory, length) = read_listing(binary_file_path);
+    let disassembly = decode::all_instructions(&memory[..length]);
+    let (memory_new, length_new) = assemble(disassembly, binary_file_path);
+
+    assert_eq!(length, length_new);
+    assert_eq!(memory, memory_new);
 }
 
-#[test]
-fn listing37() {
-    validate_listing("listing37")
+/// Save the dissasembly into a file, run nasm on it, and then load and return the resulting binary.
+/// The assembly and binary files are deleted before this function returns.
+fn assemble(disassembly: String, base_name: &str) -> (Vec<u8>, usize) {
+    let path_bin = format!("{base_name}_generated");
+    let path_asm = format!("{path_bin}.asm");
+
+    // save disassembly into a file and run it through nasm
+    let mut file = std::fs::File::create(&path_asm).unwrap();
+    file.write_all(disassembly.as_bytes()).unwrap();
+    std::process::Command::new("nasm")
+        .arg(&path_asm)
+        .output()
+        .expect("failed to execute process");
+
+    eprintln!("{path_bin}");
+    eprintln!("{path_asm}");
+    let (new_memory, new_program_length) = read_listing(&path_bin);
+
+    // cleanup before asserts
+    std::fs::remove_file(&path_asm).unwrap();
+    std::fs::remove_file(&path_bin).unwrap();
+    (new_memory, new_program_length)
 }
 
-#[test]
-fn listing38() {
-    validate_listing("listing38")
+mod decoding {
+    use crate::tests::process_file_listing;
+
+    #[test]
+    fn listing_37_single_register_mov() {
+        process_file_listing("part_1/listing_0037_single_register_mov");
+    }
+
+    #[test]
+    fn listing_38_many_register_mov() {
+        process_file_listing("part_1/listing_0038_many_register_mov");
+    }
+
+    #[test]
+    fn listing_39_more_movs() {
+        process_file_listing("part_1/listing_0039_more_movs");
+    }
+
+    #[test]
+    fn listing_41_add_sub_cmp_jnz() {
+        process_file_listing("part_1/listing_0041_add_sub_cmp_jnz");
+    }
+
+    #[test]
+    fn listing_43_immediate_movs() {
+        process_file_listing("part_1/listing_0043_immediate_movs");
+    }
+
+    #[test]
+    fn listing_44_register_movs() {
+        process_file_listing("part_1/listing_0044_register_movs");
+    }
 }
 
-// #[test]
-// fn listing39() {
-//     validate_listing("listing39")
-// }
+mod simulation {
+    #[test]
+    fn listing_43_immediate_movs() {}
 
-// #[test]
-// fn listing40() {
-//     validate_listing("listing40")
-// }
-
-mod listing39;
-// mod listing40;
-
-/// Takes a listing name (eg. "listing37")
-/// - assembles its asm file
-/// - dissassembles the binary and saves it to a file
-/// - assembles the dissassembly and finaly compares the two binaries
-fn validate_listing(listing: &str) {
-    let src_path = format!("./listings/{}.asm", listing);
-
-    let (bin1, bin2) = produce_bins(&src_path);
-    assert_eq!(bin1, bin2);
-}
-fn validate_asm(asm: &str) {
-    println!("{}", asm);
-
-    let binary_path: String = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(7)
-        .map(char::from)
-        .collect();
-    let src_path = &format!("listings/tmp/{}.asm", binary_path);
-
-    fs::write(src_path, asm).unwrap();
-    let (dasm_bin, asm_bin) = produce_bins(src_path);
-
-    if let Err(err) = remove_file(src_path) {
-        eprintln!("{}", err);
-    };
-
-    assert_eq!(dasm_bin, asm_bin);
-}
-fn produce_bins(src_path: &str) -> (Vec<u8>, Vec<u8>) {
-    let produce_bin = |src_path, bin_path| {
-        Command::new("nasm")
-            .args([src_path])
-            .output()
-            .and_then(|_| fs::read(bin_path))
-    };
-    let (src_path, bin_path) = src_bin_paths(src_path);
-    let src_path2 = format!("{}-d.asm", bin_path);
-    let (src_path2, bin_path2) = src_bin_paths(&src_path2);
-
-    let bin1 = produce_bin(src_path, bin_path).expect("Assembly compiled and read");
-
-    let bin2 =
-        fs::write(src_path2, disassemble(&bin1)).and_then(|_| produce_bin(src_path2, bin_path2));
-
-    if let Err(err) = remove_file(src_path2) {
-        eprintln!("{}", err);
-    };
-    if let Err(err) = remove_file(bin_path) {
-        eprintln!("{}", err);
-    };
-    if let Err(err) = remove_file(bin_path2) {
-        eprintln!("{}", err);
-    };
-
-    (bin1, bin2.expect("Disassembly compiled and read"))
+    #[test]
+    fn listing_44_register_movs() {}
 }
 
-fn src_bin_paths(src_path: &str) -> (&str, &str) {
-    (src_path, src_path.get(..src_path.len() - 4).unwrap())
+mod challenge {
+    // use super::process_file_listing;
+
+    // #[test]
+    // fn listing_40() {
+    //     process_file_listing("part_1/listing_0040_challenge_movs");
+    // }
+
+    // #[test]
+    // fn listing_42() {
+    //     process_file_listing("part_1/listing_0042_completionist_decode");
+    // }
+
+    // #[test]
+    // fn listing_45() {
+    //     process_file_listing("part_1/listing_0045_challenge_register_movs");
+    // }
 }
