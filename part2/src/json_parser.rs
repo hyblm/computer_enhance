@@ -41,15 +41,7 @@ fn array<'a>(mut slice: &'a str, pairs: &mut Vec<Pair>) -> Result<&'a str, Strin
     Ok(slice)
 }
 
-fn pair(slice: &str) -> Result<(&str, Pair), String> {
-    let result = pair_inner(slice);
-    if result.is_err() {
-        println!("\n\n{}\n\n", slice.split_at(50).0);
-    }
-    result
-}
-
-fn pair_inner(mut slice: &str) -> Result<(&str, Pair), String> {
+fn pair(mut slice: &str) -> Result<(&str, Pair), String> {
     let x0;
     let y0;
     let x1;
