@@ -9,8 +9,14 @@ use std::{
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
-const Y_RANGE: RangeInclusive<f64> = -180.0..=180.0;
-const X_RANGE: RangeInclusive<f64> = -90.0..=90.0;
+const Y_EXTENT: f64 = 180.0;
+const X_EXTENT: f64 = 90.0;
+const Y_RANGE: RangeInclusive<f64> = -Y_EXTENT..=Y_EXTENT;
+const X_RANGE: RangeInclusive<f64> = -X_EXTENT..=X_EXTENT;
+
+const CLUSTER_SIZE: f64 = 10.;
+const Y_CLUSTER_RANGE: RangeInclusive<f64> = -Y_EXTENT..=Y_EXTENT - CLUSTER_SIZE;
+const X_CLUSTER_RANGE: RangeInclusive<f64> = -X_EXTENT..=X_EXTENT - CLUSTER_SIZE;
 
 fn main() {
     let options = process_args();
@@ -52,12 +58,38 @@ fn main() {
 
 fn generate_pairs_uniform(count: u64, mut rng: impl Rng) -> Vec<(Coordinate, Coordinate)> {
     (0..count)
-        .map(|_| Coordinate::generate_pair_uniform(&mut rng))
+        .map(|_| {
+            (
+                Coordinate::generate_pair_uniform(&mut rng),
+                Coordinate::generate_pair_uniform(&mut rng),
+            )
+        })
         .collect()
 }
 
-fn generate_pairs_cluster(_count: u64, _rng: impl Rng) -> Vec<(Coordinate, Coordinate)> {
-    todo!()
+const CLUSTER_COUNT: u64 = 10;
+fn generate_pairs_cluster(pair_count: u64, mut rng: impl Rng) -> Vec<(Coordinate, Coordinate)> {
+    let mut pairs = Vec::with_capacity(pair_count as usize);
+    let pairs_in_cluster = pair_count / CLUSTER_COUNT;
+
+    let mut x_cluster;
+    let mut y_cluster;
+    let mut i = 0;
+    while i < pair_count {
+        let x_cluster_start = rng.random_range(X_CLUSTER_RANGE);
+        let y_cluster_start = rng.random_range(Y_CLUSTER_RANGE);
+        x_cluster = x_cluster_start..=x_cluster_start + CLUSTER_SIZE;
+        y_cluster = y_cluster_start..=y_cluster_start + CLUSTER_SIZE;
+
+        for _ in 0..pairs_in_cluster {
+            pairs.push((
+                Coordinate::generate_pair_cluster(&mut rng, x_cluster.clone(), y_cluster.clone()),
+                Coordinate::generate_pair_cluster(&mut rng, x_cluster.clone(), y_cluster.clone()),
+            ))
+        }
+        i += pairs_in_cluster;
+    }
+    pairs
 }
 
 struct Coordinate {
@@ -65,17 +97,22 @@ struct Coordinate {
     y: f64,
 }
 impl Coordinate {
-    fn generate_pair_uniform(rng: &mut impl Rng) -> (Self, Self) {
-        (
-            Coordinate {
-                x: rng.random_range(X_RANGE),
-                y: rng.random_range(Y_RANGE),
-            },
-            Coordinate {
-                x: rng.random_range(X_RANGE),
-                y: rng.random_range(Y_RANGE),
-            },
-        )
+    fn generate_pair_uniform(rng: &mut impl Rng) -> Self {
+        Coordinate {
+            x: rng.random_range(X_RANGE),
+            y: rng.random_range(Y_RANGE),
+        }
+    }
+
+    fn generate_pair_cluster(
+        rng: &mut impl Rng,
+        x_cluster: RangeInclusive<f64>,
+        y_cluster: RangeInclusive<f64>,
+    ) -> Self {
+        Coordinate {
+            x: rng.random_range(x_cluster),
+            y: rng.random_range(y_cluster),
+        }
     }
 }
 
