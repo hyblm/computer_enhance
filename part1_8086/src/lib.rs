@@ -9,8 +9,8 @@ pub mod exec;
 #[cfg(test)]
 mod tests;
 
-pub fn read_listing(binary_file_path: &str) -> (Vec<u8>, usize) {
-    let mut file = std::fs::File::open(binary_file_path).unwrap();
+pub fn read_listing(listing_path: &str) -> (Vec<u8>, usize) {
+    let mut file = std::fs::File::open(listing_path).unwrap();
 
     let mut memory = Vec::new();
     let length = match file.read_to_end(&mut memory) {

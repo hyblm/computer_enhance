@@ -2,11 +2,13 @@ use std::io::Write;
 
 use crate::{decode, read_listing};
 
-fn process_file_listing(binary_file_path: &str) {
+const LISTING_DIRECTORY: &str = "../course_reference/perfaware/part1";
+fn process_file_listing(listing_name: &str) {
+    let listing_path = format!("{LISTING_DIRECTORY}/{listing_name}");
     // disassemble listing
-    let (memory, length) = read_listing(binary_file_path);
+    let (memory, length) = read_listing(&listing_path);
     let disassembly = decode::all_instructions(&memory[..length]);
-    let (memory_new, length_new) = assemble(disassembly, binary_file_path);
+    let (memory_new, length_new) = assemble(disassembly, listing_name);
 
     assert_eq!(length, length_new);
     assert_eq!(memory, memory_new);
@@ -41,41 +43,41 @@ mod decoding {
 
     #[test]
     fn listing_37_single_register_mov() {
-        process_file_listing("part_1/listing_0037_single_register_mov");
+        process_file_listing("listing_0037_single_register_mov");
     }
 
     #[test]
     fn listing_38_many_register_mov() {
-        process_file_listing("part_1/listing_0038_many_register_mov");
+        process_file_listing("listing_0038_many_register_mov");
     }
 
     #[test]
     fn listing_39_more_movs() {
-        process_file_listing("part_1/listing_0039_more_movs");
+        process_file_listing("listing_0039_more_movs");
     }
 
     #[test]
     fn listing_41_add_sub_cmp_jnz() {
-        process_file_listing("part_1/listing_0041_add_sub_cmp_jnz");
+        process_file_listing("listing_0041_add_sub_cmp_jnz");
     }
 
     #[test]
     fn listing_43_immediate_movs() {
-        process_file_listing("part_1/listing_0043_immediate_movs");
+        process_file_listing("listing_0043_immediate_movs");
     }
 
     #[test]
     fn listing_44_register_movs() {
-        process_file_listing("part_1/listing_0044_register_movs");
+        process_file_listing("listing_0044_register_movs");
     }
 }
 
 mod simulation {
-    #[test]
-    fn listing_43_immediate_movs() {}
+    // #[test]
+    // fn listing_43_immediate_movs() {}
 
-    #[test]
-    fn listing_44_register_movs() {}
+    // #[test]
+    // fn listing_44_register_movs() {}
 }
 
 mod challenge {
@@ -83,16 +85,16 @@ mod challenge {
 
     // #[test]
     // fn listing_40() {
-    //     process_file_listing("part_1/listing_0040_challenge_movs");
+    //     process_file_listing("listing_0040_challenge_movs");
     // }
 
     // #[test]
     // fn listing_42() {
-    //     process_file_listing("part_1/listing_0042_completionist_decode");
+    //     process_file_listing("listing_0042_completionist_decode");
     // }
 
     // #[test]
     // fn listing_45() {
-    //     process_file_listing("part_1/listing_0045_challenge_register_movs");
+    //     process_file_listing("listing_0045_challenge_register_movs");
     // }
 }
