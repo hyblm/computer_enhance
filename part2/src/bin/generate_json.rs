@@ -2,12 +2,15 @@ use std::{
     env::args,
     fs::File,
     io::{BufWriter, Write},
-    // ops::RangeInclusive,
+    ops::RangeInclusive,
     process::exit,
 };
 
-// const Y_RANGE: RangeInclusive<i32> = -180..=180;
-// const X_RANGE: RangeInclusive<i32> = -90..=90;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+
+const Y_RANGE: RangeInclusive<f64> = -180.0..=180.0;
+const X_RANGE: RangeInclusive<f64> = -90.0..=90.0;
 
 fn main() {
     let options = process_args();
@@ -19,9 +22,10 @@ fn main() {
         count,
     } = options;
 
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
     let pairs: Vec<(Coordinate, Coordinate)> = match method {
-        GenerationMethod::Uniform => generate_pairs_uniform(count, seed),
-        GenerationMethod::Cluster => generate_pairs_cluster(count, seed),
+        GenerationMethod::Uniform => generate_pairs_uniform(count, &mut rng),
+        GenerationMethod::Cluster => generate_pairs_cluster(count, &mut rng),
     };
 
     let file = File::create("haversine_pairs.json").unwrap();
@@ -46,13 +50,13 @@ fn main() {
     .unwrap();
 }
 
-fn generate_pairs_uniform(count: u64, seed: u64) -> Vec<(Coordinate, Coordinate)> {
+fn generate_pairs_uniform(count: u64, mut rng: impl Rng) -> Vec<(Coordinate, Coordinate)> {
     (0..count)
-        .map(|_| Coordinate::generate_pair_uniform(seed))
+        .map(|_| Coordinate::generate_pair_uniform(&mut rng))
         .collect()
 }
 
-fn generate_pairs_cluster(_count: u64, _seed: u64) -> Vec<(Coordinate, Coordinate)> {
+fn generate_pairs_cluster(_count: u64, _rng: impl Rng) -> Vec<(Coordinate, Coordinate)> {
     todo!()
 }
 
@@ -61,8 +65,17 @@ struct Coordinate {
     y: f64,
 }
 impl Coordinate {
-    fn generate_pair_uniform(_seed: u64) -> (Self, Self) {
-        (Coordinate { x: 0., y: 0. }, Coordinate { x: 0., y: 0. })
+    fn generate_pair_uniform(rng: &mut impl Rng) -> (Self, Self) {
+        (
+            Coordinate {
+                x: rng.random_range(X_RANGE),
+                y: rng.random_range(Y_RANGE),
+            },
+            Coordinate {
+                x: rng.random_range(X_RANGE),
+                y: rng.random_range(Y_RANGE),
+            },
+        )
     }
 }
 
