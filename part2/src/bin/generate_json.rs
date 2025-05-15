@@ -21,14 +21,11 @@ const X_CLUSTER_RANGE: RangeInclusive<f64> = -X_EXTENT..=X_EXTENT - CLUSTER_SIZE
 const Y_CLUSTER_RANGE: RangeInclusive<f64> = -Y_EXTENT..=Y_EXTENT - CLUSTER_SIZE;
 
 fn main() {
-    let options = process_args_or_bail();
-    options.print();
-
     let Options {
         method,
         seed,
         count,
-    } = options;
+    } = process_args_or_bail();
 
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
     let pairs: Vec<(Coordinate, Coordinate)> = match method {
@@ -45,7 +42,16 @@ fn main() {
         .collect();
 
     let sum: f64 = distances.iter().sum();
-    println!("Expected sum: {sum}");
+    let average = sum / distances.len() as f64;
+    println!(
+        "
+Method: {method:?}
+Random seed: {seed}
+Pair count: {count}
+
+Expected Average: {average}
+            "
+    );
 
     let distances_bin: Vec<u8> = distances.into_iter().flat_map(f64::to_le_bytes).collect();
 
@@ -194,20 +200,4 @@ struct Options {
     method: GenerationMethod,
     seed: u64,
     count: u64,
-}
-impl Options {
-    fn print(&self) {
-        let Self {
-            method,
-            seed,
-            count,
-        } = self;
-        println!(
-            "
-Method: {method:?}
-Random seed: {seed}
-Pair count: {count}
-            "
-        );
-    }
 }
