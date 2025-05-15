@@ -16,3 +16,4 @@ Cargo.lock
 
 **/haversine_pairs.json
 **/haversine_distance_answers.bin
+**/.idea
