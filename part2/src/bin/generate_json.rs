@@ -33,13 +33,33 @@ fn main() {
         GenerationMethod::Uniform => generate_pairs_uniform(count, &mut rng),
         GenerationMethod::Cluster => generate_pairs_cluster(count, &mut rng),
     };
+    let distances: Vec<f64> = pairs
+        .iter()
+        .map(|pair| {
+            let (Coordinate { x: x0, y: y0 }, Coordinate { x: x1, y: y1 }) = *pair;
+            let radius = haversine::EARTH_RADIUS;
+            haversine::reference_haversine(x0, y0, x1, y1, radius)
+        })
+        .collect();
+    let sum: f64 = distances.iter().sum();
+    println!("Expected sum: {sum}");
 
-    let file = File::create("haversine_pairs.json").unwrap();
-    let mut writer = BufWriter::new(file);
-    let _ = writer.write("{ \"pairs\": [\n".as_bytes()).unwrap();
+    let distances: Vec<u8> = distances
+        .into_iter()
+        .map(f64::to_le_bytes)
+        .flatten()
+        .collect();
+
+    let answers_file = File::create("haversine_distance_answers.bin").unwrap();
+    let mut answers_w = BufWriter::new(answers_file);
+    answers_w.write_all(&distances).unwrap();
+
+    let json_file = File::create("haversine_pairs.json").unwrap();
+    let mut json_w = BufWriter::new(json_file);
+    let _ = json_w.write("{ \"pairs\": [\n".as_bytes()).unwrap();
     for (c0, c1) in pairs[..pairs.len() - 1].iter() {
         let _ = writeln!(
-            writer,
+            json_w,
             "    {{ \"x0\": {}, \"y0\": {}, \"x1\": {}, \"y1\": {}}},",
             c0.x, c0.y, c1.x, c1.y
         )
@@ -47,7 +67,7 @@ fn main() {
     }
     let (c0, c1) = pairs.last().expect("pairs is not empty");
     let _ = writeln!(
-        writer,
+        json_w,
         "    {{ \"x0\": {}, \"y0\": {}, \"x1\": {}, \"y1\": {}}}
   ]
 }}",
@@ -127,7 +147,6 @@ fn process_args() -> Options {
     let bin_name = args.next().expect("first argument is always binary name");
 
     if let Some(method) = args.next() {
-        println!("{method}");
         match method.as_str() {
             "uniform" => options.method = GenerationMethod::Uniform,
             "cluster" => options.method = GenerationMethod::Cluster,
