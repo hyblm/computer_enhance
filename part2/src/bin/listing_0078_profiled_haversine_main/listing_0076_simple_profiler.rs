@@ -50,7 +50,7 @@ macro_rules! time_function {
 #[macro_export]
 macro_rules! time_block {
     ($label:ident, $id:literal) => {
-        let $label = DropTimer::new::<$id>($label);
+        let _drop_timer = DropTimer::new::<$id>(stringify!($label));
     };
 }
 
