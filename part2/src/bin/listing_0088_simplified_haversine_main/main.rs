@@ -1,9 +1,11 @@
 use std::{env::args, fs::File, io::Read, process::exit};
 
+mod listing_0087_simplified_profiler;
+
 use haversine::{reference_haversine, EARTH_RADIUS};
+use listing_0087_simplified_profiler::{begin_profile, end_profile_and_print, DropTimer};
 use part2::json_parser::parse_haversine_pairs;
-use part2::profile::{begin_profile, end_profile_and_print, DropTimer};
-use part2::{time_function, Pair};
+use part2::Pair;
 
 fn main() {
     begin_profile();

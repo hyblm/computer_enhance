@@ -1,9 +1,13 @@
+pub mod listing_0076_simple_profiler;
+mod listing_0077_profiled_lookup_json_parser;
+
 use std::{env::args, fs::File, io::Read, process::exit};
 
 use haversine::{reference_haversine, EARTH_RADIUS};
-use part2::json_parser::parse_haversine_pairs;
-use part2::profile::{begin_profile, end_profile_and_print, DropTimer};
-use part2::{time_function, Pair};
+use listing_0076_simple_profiler::{begin_profile, end_profile_and_print, DropTimer};
+use listing_0077_profiled_lookup_json_parser::parse_haversine_pairs;
+use part2::Pair;
+use rand::seq::IndexedRandom;
 
 fn main() {
     begin_profile();
@@ -33,26 +37,8 @@ Average: {average}
     end_profile_and_print();
 }
 
-fn open_json_file() -> File {
-    time_function!(1);
-
-    let Some(path) = args().nth(1) else {
-        eprintln!("No file recieved");
-        exit(1);
-    };
-
-    let json_file = match File::open(path) {
-        Ok(file) => file,
-        Err(error) => {
-            eprintln!("Failed to open file with error: {error}");
-            exit(1);
-        }
-    };
-    json_file
-}
-
 fn read_json(mut json_file: File) -> (usize, String) {
-    time_function!(2);
+    time_function!(1);
 
     let json_length = match json_file.metadata() {
         Ok(metadata) => metadata.len() as usize,
@@ -69,15 +55,35 @@ fn read_json(mut json_file: File) -> (usize, String) {
     (json_length, json_string)
 }
 
+fn open_json_file() -> File {
+    time_function!(0);
+
+    let Some(path) = args().nth(1) else {
+        eprintln!("No file recieved");
+        exit(1);
+    };
+
+    let json_file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            eprintln!("Failed to open file with error: {error}");
+            exit(1);
+        }
+    };
+    json_file
+}
+
 fn haversine_distance_average(pairs: &[Pair]) -> f64 {
     time_function!(3);
 
     let mut sum = 0.;
 
-    let sum_coeficient = 1. / pairs.len() as f64;
-    for &pair in pairs {
-        let Pair { x0, y0, x1, y1 } = pair;
-        sum += sum_coeficient * reference_haversine(x0, y0, x1, y1, EARTH_RADIUS);
+    if !pairs.is_empty() {
+        let sum_coeficient = 1. / pairs.len() as f64;
+        for &pair in pairs {
+            let Pair { x0, y0, x1, y1 } = pair;
+            sum += sum_coeficient * reference_haversine(x0, y0, x1, y1, EARTH_RADIUS);
+        }
     }
 
     sum

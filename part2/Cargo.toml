@@ -3,6 +3,10 @@ name = "part2"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+profile = []
+
 [dependencies]
 rand = "0.9.1"
 rand_chacha = "0.9.0"
