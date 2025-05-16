@@ -50,7 +50,7 @@ macro_rules! time_function {
 #[macro_export]
 macro_rules! time_block {
     ($label:ident, $id:literal) => {
-        let $label = DropTimer::new::<$id>($label);
+        let $label = DropTimer::new::<$id>(stringify!($label));
     };
 }
 
@@ -63,7 +63,7 @@ pub struct DropTimer {
 }
 impl DropTimer {
     pub fn new<const ID: usize>(label: &'static str) -> DropTimer {
-        if ID > MAX_ANCHORS {
+        if ID >= MAX_ANCHORS {
             panic!("error");
         }
 

@@ -7,6 +7,7 @@ use haversine::{reference_haversine, EARTH_RADIUS};
 use listing_0076_simple_profiler::{begin_profile, end_profile_and_print, DropTimer};
 use listing_0077_profiled_lookup_json_parser::parse_haversine_pairs;
 use part2::Pair;
+use rand::seq::IndexedRandom;
 
 fn main() {
     begin_profile();
@@ -39,9 +40,18 @@ Average: {average}
 fn read_json(mut json_file: File) -> (usize, String) {
     time_function!(1);
 
-    let json_length = json_file.metadata().unwrap().len() as usize;
+    let json_length = match json_file.metadata() {
+        Ok(metadata) => metadata.len() as usize,
+        Err(error) => {
+            eprintln!("Failed to get file metadata: {error}");
+            exit(1);
+        }
+    };
     let mut json_string = String::with_capacity(json_length);
-    json_file.read_to_string(&mut json_string).unwrap();
+    if let Err(error) = json_file.read_to_string(&mut json_string) {
+        eprintln!("Failed to read file into in memory string: {error}");
+        exit(1);
+    };
     (json_length, json_string)
 }
 
@@ -68,10 +78,12 @@ fn haversine_distance_average(pairs: &[Pair]) -> f64 {
 
     let mut sum = 0.;
 
-    let sum_coeficient = 1. / pairs.len() as f64;
-    for &pair in pairs {
-        let Pair { x0, y0, x1, y1 } = pair;
-        sum += sum_coeficient * reference_haversine(x0, y0, x1, y1, EARTH_RADIUS);
+    if !pairs.is_empty() {
+        let sum_coeficient = 1. / pairs.len() as f64;
+        for &pair in pairs {
+            let Pair { x0, y0, x1, y1 } = pair;
+            sum += sum_coeficient * reference_haversine(x0, y0, x1, y1, EARTH_RADIUS);
+        }
     }
 
     sum

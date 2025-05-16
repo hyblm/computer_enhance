@@ -8,7 +8,7 @@ use part2::Pair;
 fn main() {
     let timing_start = read_timer_cpu();
     let Some(path) = args().nth(1) else {
-        eprintln!("No file recieved");
+        eprintln!("No file received");
         exit(1);
     };
 
@@ -21,9 +21,18 @@ fn main() {
     };
     let timing_startup = read_timer_cpu();
 
-    let json_length = json_file.metadata().unwrap().len() as usize;
+    let json_length = match json_file.metadata() {
+        Ok(metadata) => metadata.len() as usize,
+        Err(error) => {
+            eprintln!("Failed to get file metadata: {error}");
+            exit(1);
+        }
+    };
     let mut json_string = String::with_capacity(json_length);
-    json_file.read_to_string(&mut json_string).unwrap();
+    if let Err(error) = json_file.read_to_string(&mut json_string) {
+        eprintln!("Failed to read file into in memory string: {error}");
+        exit(1);
+    };
     let timing_read = read_timer_cpu();
 
     let pairs = match parse_haversine_pairs(&json_string) {

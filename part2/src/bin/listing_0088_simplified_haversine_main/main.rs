@@ -56,9 +56,18 @@ fn open_json_file() -> File {
 fn read_json(mut json_file: File) -> (usize, String) {
     time_function!(2);
 
-    let json_length = json_file.metadata().unwrap().len() as usize;
+    let json_length = match json_file.metadata() {
+        Ok(metadata) => metadata.len() as usize,
+        Err(error) => {
+            eprintln!("Failed to get file metadata: {error}");
+            exit(1);
+        }
+    };
     let mut json_string = String::with_capacity(json_length);
-    json_file.read_to_string(&mut json_string).unwrap();
+    if let Err(error) = json_file.read_to_string(&mut json_string) {
+        eprintln!("Failed to read file into in memory string: {error}");
+        exit(1);
+    };
     (json_length, json_string)
 }
 

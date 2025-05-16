@@ -61,7 +61,7 @@ pub struct DropTimer {
 }
 impl DropTimer {
     pub fn new<const ID: usize>(label: &'static str) -> DropTimer {
-        if ID > MAX_ANCHORS {
+        if ID >= MAX_ANCHORS {
             panic!("error");
         }
 
