@@ -95,6 +95,7 @@ fn pair(mut slice: &str) -> Result<(&str, Pair), String> {
 }
 
 fn number(mut slice: &str) -> Result<(&str, f64), String> {
+    time_function!(5);
     let sign = match consume(slice, "-") {
         Ok(rest) => {
             slice = rest;

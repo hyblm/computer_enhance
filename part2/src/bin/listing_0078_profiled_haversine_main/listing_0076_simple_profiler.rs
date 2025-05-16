@@ -138,10 +138,10 @@ pub fn end_profile_and_print() {
     let tsc_one_percent = tsc_total as f64 / 100.;
     let anchors = unsafe { PROFILER.anchors };
     for Anchor { label, tsc_elapsed } in anchors {
-        if tsc_elapsed == 0 {
-            break;
+        if label.is_empty() {
+            continue;
         };
         let perc_elapsed = tsc_elapsed as f64 / tsc_one_percent;
-        println!("{label}: {tsc_elapsed} ({perc_elapsed:.2})%");
+        println!("{label}: {tsc_elapsed} ({perc_elapsed:.2}%)");
     }
 }
