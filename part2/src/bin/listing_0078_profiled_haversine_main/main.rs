@@ -1,9 +1,12 @@
+pub mod listing_0076_simple_profiler;
+mod listing_0077_profiled_lookup_json_parser;
+
 use std::{env::args, fs::File, io::Read, process::exit};
 
 use haversine::{reference_haversine, EARTH_RADIUS};
-use part2::json_parser::parse_haversine_pairs;
-use part2::profile::{begin_profile, end_profile_and_print, DropTimer};
-use part2::{time_function, Pair};
+use listing_0076_simple_profiler::{begin_profile, end_profile_and_print, DropTimer};
+use listing_0077_profiled_lookup_json_parser::parse_haversine_pairs;
+use part2::Pair;
 
 fn main() {
     begin_profile();

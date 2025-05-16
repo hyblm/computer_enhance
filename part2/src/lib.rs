@@ -1,4 +1,5 @@
 pub mod json_parser;
+pub mod profile;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Pair {
