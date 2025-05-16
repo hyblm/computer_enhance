@@ -1,0 +1,13 @@
+[package]
+name = "part3"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["profile"]
+profile = []
+
+[dependencies]
+rand = "0.9.1"
+rand_chacha = "0.9.0"
+haversine = { path = "../haversine" }
