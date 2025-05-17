@@ -2,7 +2,7 @@ use std::{env::args, fs::File, io::Read, process::exit};
 
 use haversine::{reference_haversine, EARTH_RADIUS};
 use part2::json_parser::parse_haversine_pairs;
-use part2::profile::{begin_profile, end_profile_and_print, DropTimer};
+use part2::profile::{begin_profile, end_profile_and_print};
 use part2::{time_function, Pair};
 
 fn main() {

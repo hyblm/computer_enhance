@@ -21,9 +21,8 @@ pub fn estimate_cpu_frequency(millis_to_wait: u64) -> f64 {
 
     let cpu_end = read_timer_cpu();
     let cpu_elapsed = cpu_end - cpu_start;
-    let cpu_frequency = cpu_elapsed as f64 / os_elapsed.as_secs_f64();
 
-    return cpu_frequency;
+    cpu_elapsed as f64 / os_elapsed.as_secs_f64()
 }
 
 static mut PROFILER: internals::Profiler = internals::Profiler::new();

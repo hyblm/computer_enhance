@@ -22,9 +22,8 @@ pub fn estimate_cpu_frequency(millis_to_wait: u64) -> f64 {
 
     let cpu_end = read_timer_cpu();
     let cpu_elapsed = cpu_end - cpu_start;
-    let cpu_frequency = cpu_elapsed as f64 / os_elapsed.as_secs_f64() / 1_000.;
 
-    return cpu_frequency;
+    cpu_elapsed as f64 / os_elapsed.as_secs_f64() / 1_000.
 }
 
 #[macro_export]
@@ -73,6 +72,7 @@ impl DropTimer {
         }
     }
 }
+#[allow(static_mut_refs)]
 impl Drop for DropTimer {
     fn drop(&mut self) {
         let tsc_end = read_timer_cpu();

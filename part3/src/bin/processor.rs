@@ -41,14 +41,13 @@ fn open_json_file() -> File {
         exit(1);
     };
 
-    let json_file = match File::open(path) {
+    match File::open(path) {
         Ok(file) => file,
         Err(error) => {
             eprintln!("Failed to open file with error: {error}");
             exit(1);
         }
-    };
-    json_file
+    }
 }
 
 fn read_json(mut json_file: File) -> (usize, String) {
@@ -70,7 +69,7 @@ fn read_json(mut json_file: File) -> (usize, String) {
 }
 
 fn haversine_distance_average(pairs: &[Pair]) -> f64 {
-    time_function!(3 with (pairs.len() * std::mem::size_of::<Pair>()) as u64);
+    time_function!(3 with std::mem::size_of_val(pairs) as u64);
 
     let mut sum = 0.;
 

@@ -1,4 +1,4 @@
-use crate::{profile::DropTimer, time_function, Pair};
+use crate::{time_function, Pair};
 
 pub fn parse_haversine_pairs(json_slice: &str) -> Result<Vec<Pair>, String> {
     time_function!(4);

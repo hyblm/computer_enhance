@@ -7,7 +7,6 @@ use haversine::{reference_haversine, EARTH_RADIUS};
 use listing_0076_simple_profiler::{begin_profile, end_profile_and_print, DropTimer};
 use listing_0077_profiled_lookup_json_parser::parse_haversine_pairs;
 use part2::Pair;
-use rand::seq::IndexedRandom;
 
 fn main() {
     begin_profile();
